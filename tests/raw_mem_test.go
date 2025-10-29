@@ -2,11 +2,14 @@ package tests
 
 import (
 	"log"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/hanwen/go-fuse/v2/fuse"
 )
+
+var mock_invalid_inode atomic.Bool
 
 type memFileSystem struct {
 	fuse.RawFileSystem
@@ -311,6 +314,13 @@ func (m *memFileSystem) Read(cancel <-chan struct{}, input *fuse.ReadIn, buf []b
 func (m *memFileSystem) Write(cancel <-chan struct{}, input *fuse.WriteIn, data []byte) (written uint32, code fuse.Status) {
 	log.Printf("Write(input.NodeId=%d, input.Offset=%d, len(data)=%d)", input.NodeId, input.Offset, len(data))
 
+	if mock_invalid_inode.Load() {
+		mock_invalid_inode.Store(false)
+
+		log.Printf("Write: mock invalid inode, returning ESTALE for node %d", input.NodeId)
+		return 0, fuse.Status(syscall.ESTALE)
+	}
+
 	node, ok := m.nodes[input.NodeId]
 	if !ok {
 		log.Printf("Write: node %d not found", input.NodeId)
@@ -547,6 +557,143 @@ func (m *memFileSystem) Release(cancel <-chan struct{}, input *fuse.ReleaseIn) {
 func (m *memFileSystem) ReleaseDir(input *fuse.ReleaseIn) {
 	log.Printf("ReleaseDir(input.NodeId=%d, input.Fh=%d)", input.NodeId, input.Fh)
 	// For this simple implementation, we do nothing
+}
+
+// Mknod creates a special file node
+func (m *memFileSystem) Mknod(cancel <-chan struct{}, input *fuse.MknodIn, name string, out *fuse.EntryOut) (code fuse.Status) {
+	log.Printf("Mknod(input.NodeId=%d, name=%s) - not implemented", input.NodeId, name)
+	return fuse.ENOSYS
+}
+
+// Link creates a hard link
+func (m *memFileSystem) Link(cancel <-chan struct{}, input *fuse.LinkIn, filename string, out *fuse.EntryOut) (code fuse.Status) {
+	log.Printf("Link(input.NodeId=%d, filename=%s) - not implemented", input.NodeId, filename)
+	return fuse.ENOSYS
+}
+
+// Symlink creates a symbolic link
+func (m *memFileSystem) Symlink(cancel <-chan struct{}, header *fuse.InHeader, pointedTo string, linkName string, out *fuse.EntryOut) (code fuse.Status) {
+	log.Printf("Symlink(header.NodeId=%d, pointedTo=%s, linkName=%s) - not implemented", header.NodeId, pointedTo, linkName)
+	return fuse.ENOSYS
+}
+
+// Readlink reads the target of a symbolic link
+func (m *memFileSystem) Readlink(cancel <-chan struct{}, header *fuse.InHeader) (out []byte, code fuse.Status) {
+	log.Printf("Readlink(header.NodeId=%d) - not implemented", header.NodeId)
+	return nil, fuse.ENOSYS
+}
+
+// Access checks access permissions for a node
+func (m *memFileSystem) Access(cancel <-chan struct{}, input *fuse.AccessIn) (code fuse.Status) {
+	log.Printf("Access(input.NodeId=%d, input.Mask=%d) - not implemented", input.NodeId, input.Mask)
+	return fuse.ENOSYS
+}
+
+// GetXAttr gets extended attribute value
+func (m *memFileSystem) GetXAttr(cancel <-chan struct{}, header *fuse.InHeader, attr string, dest []byte) (sz uint32, code fuse.Status) {
+	log.Printf("GetXAttr(header.NodeId=%d, attr=%s) - not implemented", header.NodeId, attr)
+	return 0, fuse.ENOSYS
+}
+
+// ListXAttr lists extended attributes
+func (m *memFileSystem) ListXAttr(cancel <-chan struct{}, header *fuse.InHeader, dest []byte) (uint32, fuse.Status) {
+	log.Printf("ListXAttr(header.NodeId=%d) - not implemented", header.NodeId)
+	return 0, fuse.ENOSYS
+}
+
+// SetXAttr sets extended attribute value
+func (m *memFileSystem) SetXAttr(cancel <-chan struct{}, input *fuse.SetXAttrIn, attr string, data []byte) fuse.Status {
+	log.Printf("SetXAttr(input.NodeId=%d, attr=%s) - not implemented", input.NodeId, attr)
+	return fuse.ENOSYS
+}
+
+// RemoveXAttr removes an extended attribute
+func (m *memFileSystem) RemoveXAttr(cancel <-chan struct{}, header *fuse.InHeader, attr string) (code fuse.Status) {
+	log.Printf("RemoveXAttr(header.NodeId=%d, attr=%s) - not implemented", header.NodeId, attr)
+	return fuse.ENOSYS
+}
+
+// Lseek performs an lseek operation
+func (m *memFileSystem) Lseek(cancel <-chan struct{}, in *fuse.LseekIn, out *fuse.LseekOut) fuse.Status {
+	log.Printf("Lseek(in.NodeId=%d) - not implemented", in.NodeId)
+	return fuse.ENOSYS
+}
+
+// GetLk gets file lock information
+func (m *memFileSystem) GetLk(cancel <-chan struct{}, input *fuse.LkIn, out *fuse.LkOut) (code fuse.Status) {
+	log.Printf("GetLk(input.NodeId=%d) - not implemented", input.NodeId)
+	return fuse.ENOSYS
+}
+
+// SetLk sets a file lock
+func (m *memFileSystem) SetLk(cancel <-chan struct{}, input *fuse.LkIn) (code fuse.Status) {
+	log.Printf("SetLk(input.NodeId=%d) - not implemented", input.NodeId)
+	return fuse.ENOSYS
+}
+
+// SetLkw sets a file lock and waits
+func (m *memFileSystem) SetLkw(cancel <-chan struct{}, input *fuse.LkIn) (code fuse.Status) {
+	log.Printf("SetLkw(input.NodeId=%d) - not implemented", input.NodeId)
+	return fuse.ENOSYS
+}
+
+// CopyFileRange copies a range of data between files
+func (m *memFileSystem) CopyFileRange(cancel <-chan struct{}, input *fuse.CopyFileRangeIn) (written uint32, code fuse.Status) {
+	log.Printf("CopyFileRange(input.NodeId=%d) - not implemented", input.NodeId)
+	return 0, fuse.ENOSYS
+}
+
+// Flush flushes file data
+func (m *memFileSystem) Flush(cancel <-chan struct{}, input *fuse.FlushIn) fuse.Status {
+	log.Printf("Flush(input.NodeId=%d, input.Fh=%d) - not implemented", input.NodeId, input.Fh)
+	return fuse.ENOSYS
+}
+
+// Fsync synchronizes file data
+func (m *memFileSystem) Fsync(cancel <-chan struct{}, input *fuse.FsyncIn) (code fuse.Status) {
+	log.Printf("Fsync(input.NodeId=%d, input.Fh=%d) - not implemented", input.NodeId, input.Fh)
+	return fuse.ENOSYS
+}
+
+// Fallocate preallocates file space
+func (m *memFileSystem) Fallocate(cancel <-chan struct{}, input *fuse.FallocateIn) (code fuse.Status) {
+	log.Printf("Fallocate(input.NodeId=%d, input.Fh=%d) - not implemented", input.NodeId, input.Fh)
+	return fuse.ENOSYS
+}
+
+// OpenDir opens a directory
+func (m *memFileSystem) OpenDir(cancel <-chan struct{}, input *fuse.OpenIn, out *fuse.OpenOut) (status fuse.Status) {
+	log.Printf("OpenDir(input.NodeId=%d, input.Flags=%d)", input.NodeId, input.Flags)
+
+	_, ok := m.nodes[input.NodeId]
+	if !ok {
+		log.Printf("OpenDir: node %d not found", input.NodeId)
+		return fuse.Status(syscall.ENOENT)
+	}
+
+	out.Fh = 0
+	log.Printf("OpenDir: successfully opened directory node %d", input.NodeId)
+	return fuse.OK
+}
+
+// ReadDirPlus reads directory entries with full attributes
+func (m *memFileSystem) ReadDirPlus(cancel <-chan struct{}, input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
+	log.Printf("ReadDirPlus(input.NodeId=%d) - use ReadDir to replace it", input.NodeId)
+
+	return m.ReadDir(cancel, input, out)
+	// return fuse.ENOSYS
+}
+
+// FsyncDir synchronizes directory data
+func (m *memFileSystem) FsyncDir(cancel <-chan struct{}, input *fuse.FsyncIn) (code fuse.Status) {
+	log.Printf("FsyncDir(input.NodeId=%d, input.Fh=%d) - not implemented", input.NodeId, input.Fh)
+	return fuse.ENOSYS
+}
+
+// Ioctl performs an ioctl operation
+func (m *memFileSystem) Ioctl(cancel <-chan struct{}, in *fuse.IoctlIn, out *fuse.IoctlOut, bufIn, bufOut []byte) fuse.Status {
+	log.Printf("Ioctl(in.NodeId=%d) - not implemented", in.NodeId)
+	return fuse.ENOSYS
 }
 
 // Helper function to set file attributes
