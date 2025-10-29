@@ -10,6 +10,8 @@ import (
 )
 
 var mock_invalid_inode atomic.Bool
+var op_nums atomic.Int32
+var open_nums atomic.Int32
 
 type memFileSystem struct {
 	fuse.RawFileSystem
@@ -69,7 +71,16 @@ func (m *memFileSystem) Init(s *fuse.Server) {
 
 // Lookup finds a child node by name
 func (m *memFileSystem) Lookup(cancel <-chan struct{}, header *fuse.InHeader, name string, out *fuse.EntryOut) (status fuse.Status) {
+
 	log.Printf("Lookup(header.NodeId=%d, name=%s)", header.NodeId, name)
+
+	op_nums.Add(1)
+	// if ops := op_nums.Load(); ops%2 == 0 && header.NodeId != 1 || mock_invalid_inode.Load() {
+	// 	mock_invalid_inode.Store(false)
+
+	// 	log.Printf("Lookup(input.NodeId=%d), mock invalid inode, return ERROR\n", header.NodeId)
+	// 	return fuse.Status(syscall.ESTALE)
+	// }
 
 	node, ok := m.nodes[header.NodeId]
 	if !ok {
@@ -114,7 +125,7 @@ func (m *memFileSystem) GetAttr(cancel <-chan struct{}, input *fuse.GetAttrIn, o
 
 	setAttr(&out.Attr, node)
 	out.AttrValid = 10
-	out.AttrValidNsec = 0
+	out.AttrValidNsec = 1000000000
 
 	log.Printf("GetAttr: returning attributes for node %d", input.NodeId)
 	return fuse.OK
@@ -167,6 +178,12 @@ func (m *memFileSystem) SetAttr(cancel <-chan struct{}, input *fuse.SetAttrIn, o
 func (m *memFileSystem) Mkdir(cancel <-chan struct{}, input *fuse.MkdirIn, name string, out *fuse.EntryOut) (code fuse.Status) {
 	log.Printf("Mkdir(input.NodeId=%d, name=%s, mode=%o)", input.NodeId, name, input.Mode)
 
+	op_nums.Add(1)
+	if ops := op_nums.Load(); ops%2 == 0 && input.NodeId != 1 {
+		log.Printf("Mkdir(input.NodeId=%d), mock invalid inode, return ERROR\n", input.NodeId)
+		return fuse.Status(syscall.ESTALE)
+	}
+
 	parent, ok := m.nodes[input.NodeId]
 	if !ok {
 		log.Printf("Mkdir: parent node %d not found", input.NodeId)
@@ -212,6 +229,12 @@ func (m *memFileSystem) Mkdir(cancel <-chan struct{}, input *fuse.MkdirIn, name 
 // Create creates a file
 func (m *memFileSystem) Create(cancel <-chan struct{}, input *fuse.CreateIn, name string, out *fuse.CreateOut) (code fuse.Status) {
 	log.Printf("Create(input.NodeId=%d, name=%s, mode=%o)", input.NodeId, name, input.Mode)
+
+	op_nums.Add(1)
+	if ops := op_nums.Load(); ops%2 == 0 && input.NodeId != 1 {
+		log.Printf("Create(input.NodeId=%d), mock invalid inode, return ERROR\n", input.NodeId)
+		return fuse.Status(syscall.ESTALE)
+	}
 
 	parent, ok := m.nodes[input.NodeId]
 	if !ok {
@@ -269,6 +292,13 @@ func (m *memFileSystem) Create(cancel <-chan struct{}, input *fuse.CreateIn, nam
 func (m *memFileSystem) Open(cancel <-chan struct{}, input *fuse.OpenIn, out *fuse.OpenOut) (status fuse.Status) {
 	log.Printf("Open(input.NodeId=%d, input.Flags=%d)", input.NodeId, input.Flags)
 
+	open_nums.Add(1)
+	if ops := open_nums.Load(); ops%2 == 0 && input.NodeId != 1 {
+		log.Printf("Open(input.NodeId=%d), mock invalid inode, return ERROR\n", input.NodeId)
+		// return fuse.Status(syscall.ESTALE)
+		return fuse.Status(syscall.ESTALE)
+	}
+
 	_, ok := m.nodes[input.NodeId]
 	if !ok {
 		log.Printf("Open: node %d not found", input.NodeId)
@@ -314,12 +344,13 @@ func (m *memFileSystem) Read(cancel <-chan struct{}, input *fuse.ReadIn, buf []b
 func (m *memFileSystem) Write(cancel <-chan struct{}, input *fuse.WriteIn, data []byte) (written uint32, code fuse.Status) {
 	log.Printf("Write(input.NodeId=%d, input.Offset=%d, len(data)=%d)", input.NodeId, input.Offset, len(data))
 
-	if mock_invalid_inode.Load() {
-		mock_invalid_inode.Store(false)
+	// if mock_invalid_inode.Load() {
+	// 	mock_invalid_inode.Store(false)
 
-		log.Printf("Write: mock invalid inode, returning ESTALE for node %d", input.NodeId)
-		return 0, fuse.Status(syscall.ESTALE)
-	}
+	// 	log.Printf("Write: mock invalid inode, returning Error for node %d", input.NodeId)
+	// 	// return 0, fuse.Status(syscall.EBADFD)
+	// 	return 0, fuse.Status(syscall.ESTALE)
+	// }
 
 	node, ok := m.nodes[input.NodeId]
 	if !ok {
@@ -482,6 +513,12 @@ func (m *memFileSystem) Rename(cancel <-chan struct{}, input *fuse.RenameIn, old
 // ReadDir reads directory entries
 func (m *memFileSystem) ReadDir(cancel <-chan struct{}, input *fuse.ReadIn, out *fuse.DirEntryList) fuse.Status {
 	log.Printf("ReadDir(input.NodeId=%d)", input.NodeId)
+
+	op_nums.Add(1)
+	if ops := op_nums.Load(); ops%2 == 0 && input.NodeId != 1 {
+		log.Printf("ReadDir(input.NodeId=%d), mock invalid inode, return ERROR\n", input.NodeId)
+		return fuse.Status(syscall.ESTALE)
+	}
 
 	node, ok := m.nodes[input.NodeId]
 	if !ok {
@@ -664,6 +701,12 @@ func (m *memFileSystem) Fallocate(cancel <-chan struct{}, input *fuse.FallocateI
 // OpenDir opens a directory
 func (m *memFileSystem) OpenDir(cancel <-chan struct{}, input *fuse.OpenIn, out *fuse.OpenOut) (status fuse.Status) {
 	log.Printf("OpenDir(input.NodeId=%d, input.Flags=%d)", input.NodeId, input.Flags)
+
+	op_nums.Add(1)
+	if ops := op_nums.Load(); ops%2 == 0 && input.NodeId != 1 {
+		log.Printf("OpenDir(input.NodeId=%d), mock invalid inode, return ERROR\n", input.NodeId)
+		return fuse.Status(syscall.ESTALE)
+	}
 
 	_, ok := m.nodes[input.NodeId]
 	if !ok {
