@@ -32,7 +32,7 @@ func createAndReadFile(sleepSeconds int) {
 
 	time.Sleep(time.Second * time.Duration(sleepSeconds))
 
-	// 打开文件用于读写，不存在则创建
+	// 打开文件用于读写
 	file, err := os.OpenFile("/tmp/memfs/data.txt", os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		log.Fatal(err)
